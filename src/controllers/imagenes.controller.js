@@ -18,9 +18,19 @@ class ImagenesController {
             // Convertimos la imagen de base64 a un buffer (formato binario)
             const bufferImagen = Buffer.from(imagenBase64, 'base64');
 
-            // Crear la consulta para actualizar el campo "imagen" del registro
-            const query = `UPDATE ?? SET imagen = ? WHERE ?? = ?`;
-            const [result] = await db.query(query, [tabla, bufferImagen, campoId, id]);
+            // Determinar el nombre del campo de imagen según la tabla
+            let campoImagen = 'imagen'; // Por defecto
+            if (tabla === 'Servicios') {
+                campoImagen = 'servImagen';
+            } else if (tabla === 'Cursos') {
+                campoImagen = 'cursoImagen';
+            } else if (tabla === 'Hv') {
+                campoImagen = 'hvImagenAntes'; // o 'hvImagenDespues' según se necesite
+            }
+
+            // Crear la consulta para actualizar el campo imagen del registro
+            const query = `UPDATE ?? SET ?? = ? WHERE ?? = ?`;
+            const [result] = await db.query(query, [tabla, campoImagen, bufferImagen, campoId, id]);
 
             // Validar si la actualización fue exitosa
             if (result.affectedRows > 0) {
@@ -37,8 +47,18 @@ class ImagenesController {
     // Método para obtener una imagen desde un registro y devolverla en formato base64
     async obtenerImagen(tabla, campoId, id) {
         try {
-            // Consultar el campo "imagen" del registro
-            const [rows] = await db.query(`SELECT imagen FROM ?? WHERE ?? = ?`, [tabla, campoId, id]);
+            // Determinar el nombre del campo de imagen según la tabla
+            let campoImagen = 'imagen'; // Por defecto
+            if (tabla === 'Servicios') {
+                campoImagen = 'servImagen';
+            } else if (tabla === 'Cursos') {
+                campoImagen = 'cursoImagen';
+            } else if (tabla === 'Hv') {
+                campoImagen = 'hvImagenAntes'; // o 'hvImagenDespues' según se necesite
+            }
+
+            // Consultar el campo imagen del registro
+            const [rows] = await db.query(`SELECT ?? FROM ?? WHERE ?? = ?`, [campoImagen, tabla, campoId, id]);
 
             // Validar si se encontró el registro
             if (rows.length === 0) {
@@ -46,15 +66,18 @@ class ImagenesController {
             }
 
             // Verificar si el campo imagen está vacío
-            if (!rows[0].imagen) {
+            if (!rows[0][campoImagen]) {
                 return { error: 'No hay imagen asociada a este registro' };
             }
 
             // Convertir la imagen en binario a base64
-            const imagenBase64 = rows[0].imagen.toString('base64');
+            const imagenBase64 = rows[0][campoImagen].toString('base64');
 
-            // Retornar la imagen codificada
-            return { imagen: imagenBase64 };
+            // Retornar la imagen codificada con el nombre del campo correspondiente
+            const resultado = { imagen: imagenBase64 };
+            resultado[campoImagen] = imagenBase64;
+
+            return resultado;
         } catch (error) {
             console.error('Error al obtener la imagen ', error);
             throw error;
