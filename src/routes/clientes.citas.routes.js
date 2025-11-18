@@ -6,7 +6,7 @@ const CrudControllerCitas = require('../controllers/citas_cliente.controller');
 const crudgenericoController = require('../controllers/crud.controller');
 
 // se crea una nueva instancia para utilizar los metodos 
-const crudCitas = new CrudControllerCitas();
+const crudCitas = new CrudControllerCitas(); // Ahora CrudControllerCitas está definido
 
 //se define el nombre de la tabla en la base de datos sobre la que se operará
 const tabla = 'Citas';
@@ -15,11 +15,11 @@ const tabla = 'Citas';
 const idCampo = 'idCita';
 
 //Ruta para obtener todos los registros de citas 
-
 router.get('/', async (req, res) => {
     try {
-        //utilizar el método obtener todos los datos del controlador para obtener todos los registros 
-        const citas = await crudgenericoController.obtenerTabla(tabla);
+        // Lee param para JOIN condicional (opcional, para futuro prefill)
+        const includeCliente = req.query.includeCliente === 'true';
+        const citas = await crudCitas.obtenerCitasConDetalles(includeCliente); // Usa método de instancia
         //Respuesta con el arreglo de personas en formato JSON
         res.json(citas);
     } catch (error) {
@@ -28,7 +28,6 @@ router.get('/', async (req, res) => {
 });
 
 //ruta para obtener una cita especifica por su id
-
 router.get('/:id', async (req, res) => {
     try {
         const cita = await crudgenericoController.obtenerTablaId(tabla, idCampo, req.params.id);
@@ -50,14 +49,13 @@ router.post('/', async (req, res) => {
     }
 });
 
-
-//Ruta para  actualizar una cita existente por id
+// Ruta para  actualizar una cita existente por id
 router.put('/:id', async (req, res) => {
     try {
-        const citaActualizada = await crudgenericoController.actualizar(tabla, idCampo, req.params.id, req.body);
-        //respuesta con el registro actualizado 
+        const citaActualizada = await crudCitas.actualizarCita(req.params.id, req.body); // Usa método específico
         res.json(citaActualizada);
     } catch (error) {
+        console.error('Error en PUT cita:', error.message, error.stack); // LOG en route
         res.status(500).json({ error: error.message });
     }
 });
@@ -135,4 +133,4 @@ router.delete('/:id', async (req, res) => {
     }
 });
 
-module.exports = router; 
+module.exports = router;

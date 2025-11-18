@@ -397,6 +397,132 @@ class CrudControllerCitas {
             connection.release();
         }
     }
+
+    // NUEVO: Método para obtener citas con detalles (incluyendo JOIN condicional con Cliente)
+    async obtenerCitasConDetalles(includeCliente = false) {
+        const connection = await db.getConnection();
+        try {
+            // Query base: Citas + JOIN con Servicios y Profesional
+            let query = `
+                SELECT 
+                    c.idCita, c.idCliente, c.idServicios, c.idProfesional, c.fechaCita, c.horaCita, c.fin_cita, c.numeroReferencia, c.estadoCita, c.estadoPago,
+                    cl.nombreCliente, cl.celularCliente,
+                    s.nombre as servNombre, s.servCosto, s.servDuracion,
+                    p.nombreProfesional
+            FROM Citas c
+            LEFT JOIN Cliente cl ON c.idCliente = cl.idCliente
+            LEFT JOIN Servicios s ON c.idServicios = s.idServicios
+            LEFT JOIN Profesional p ON c.idProfesional = p.idProfesional
+            `;
+
+            // CAMBIO: Si includeCliente=true, agrega campos extra de Cliente (ya incluidos en base, pero condicional para performance)
+            if (includeCliente) {
+                // Ya están cl.nombreCliente y cl.celularCliente; agrega fechaNacCliente si no
+                query = query.replace('cl.nombreCliente, cl.celularCliente,', 'cl.nombreCliente, cl.celularCliente, cl.fechaNacCliente,');
+            }
+
+            query += ' ORDER BY c.fechaCita ASC';
+
+            const [rows] = await connection.query(query);
+
+            // Mapeo para respuesta plana (ya plana por SQL, pero limpia si null)
+            return rows.map(row => ({
+                ...row,
+                fechaNacCliente: row.fechaNacCliente || null, // Asegura null si no hay cliente
+                celularCliente: row.celularCliente || null,
+                servNombre: row.servNombre || 'No asignado',
+                nombreProfesional: row.nombreProfesional || 'No asignado'
+            }));
+
+        } catch (error) {
+            console.error('Error en obtenerCitasConDetalles:', error);
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
+    async actualizarCita(idCita, data) {
+        const connection = await db.getConnection();
+        try {
+            if (!idCita || isNaN(parseInt(idCita))) {
+                throw new Error('ID de cita inválido');
+            }
+
+            await connection.beginTransaction();
+
+            // PASO 1: Fetch la cita existente para preservar idCliente y otros fijos (evita null)
+            const [[citaExistente]] = await connection.query(
+                `SELECT * FROM Citas WHERE idCita = ?`,
+                [parseInt(idCita)]
+            );
+            if (!citaExistente) {
+                throw new Error('Cita no encontrada');
+            }
+
+            // PASO 2: Merge data nueva con existente (preserva idCliente, recalcula fin_cita si necesario)
+            const mergedData = {
+                ...citaExistente, // Preserva todo existente (incluye idCliente NOT NULL)
+                ...data, // Sobrescribe solo lo enviado (fechaCita, estadoCita, etc.)
+                numeroReferencia: data.numeroReferencia || citaExistente.numeroReferencia // Preserva si no cambias
+            };
+
+            // Si cambias idServicios, recalcula fin_cita
+            if (data.idServicios && data.idServicios !== citaExistente.idServicios) {
+                const [[servicio]] = await connection.query(
+                    `SELECT servDuracion FROM Servicios WHERE idServicios = ?`,
+                    [mergedData.idServicios]
+                );
+                if (!servicio) {
+                    throw new Error('Servicio no encontrado');
+                }
+                const duracionMinutos = parseInt(servicio.servDuracion, 10);
+                const horaCitaMoment = moment(mergedData.horaCita, 'HH:mm:ss');
+                const finCitaMoment = horaCitaMoment.clone().add(duracionMinutos, 'minutes');
+                mergedData.fin_cita = finCitaMoment.format('HH:mm:ss');
+            }
+
+            // PASO 3: UPDATE con mergedData (solo campos que cambian, pero incluye todos para seguridad)
+            const [res] = await connection.query(
+                `UPDATE Citas SET 
+                idCliente = ?, idServicios = ?, idProfesional = ?, fechaCita = ?, horaCita = ?, fin_cita = ?, numeroReferencia = ?, 
+                estadoCita = ?, estadoPago = ?  -- Campos admin
+                WHERE idCita = ?`,
+                [
+                    mergedData.idCliente, // Preservado del existente (no null)
+                    mergedData.idServicios,
+                    mergedData.idProfesional,
+                    mergedData.fechaCita,
+                    mergedData.horaCita,
+                    mergedData.fin_cita,
+                    mergedData.numeroReferencia,
+                    mergedData.estadoCita || 'Pendiente', // Default si no viene
+                    mergedData.estadoPago || 'Pendiente', // Default si no viene
+                    parseInt(idCita)
+                ]
+            );
+
+            if (res.affectedRows === 0) {
+                throw new Error('Cita no encontrada o no actualizada');
+            }
+
+            await connection.commit();
+
+            // PASO 4: Devuelve la cita actualizada (fetch para datos completos)
+            const [[citaActualizada]] = await connection.query(
+                `SELECT * FROM Citas WHERE idCita = ?`,
+                [parseInt(idCita)]
+            );
+
+            return citaActualizada[0] || { message: 'Cita actualizada exitosamente' };
+        } catch (error) {
+            await connection.rollback();
+            console.error('Error en actualizarCita:', error.message, error.stack); // LOG DETALLADO para debug
+            throw new Error(error.message || 'Error al actualizar cita');
+        } finally {
+            connection.release();
+        }
+    }
 }
 
 module.exports = CrudControllerCitas;
