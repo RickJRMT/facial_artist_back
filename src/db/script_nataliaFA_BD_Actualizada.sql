@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS Profesional (
     nombreProfesional VARCHAR(100) NOT NULL,
     correoProfesional VARCHAR(100) NOT NULL,
     telefonoProfesional VARCHAR(20) NOT NULL,
-    contraProfesional VARCHAR(300) NOT NULL,
+    contraProfesional VARCHAR(300),
     fechaCreacionProf DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -96,9 +96,9 @@ VALUES
 -- Insertar datos en la tabla Profesional
 INSERT INTO Profesional (nombreProfesional, correoProfesional, telefonoProfesional, contraProfesional)
 VALUES 
-('Natalia Ruiz', 'natalia@facialartist.com', '3001234567', 'contra123'),
-('Paola Fernández', 'paola@facialartist.com', '3007654321', 'contra456'),
-('Carla Díaz', 'carla@facialartist.com', '3009876543', 'contra789');
+('Natalia Ruiz', 'natalia@facialartist.com', '3001234567', '$2a$12$JkJSWyBm7tCmXgpotpAOf.F.v8Dr07raqmKDaeoVU8kmE1LIgiPyO'), -- contraseña encriptada "admin123"
+('Paola Fernández', 'paola@facialartist.com', '3007654321', null),
+('Carla Díaz', 'carla@facialartist.com', '3009876543', null);
 
 -- Insertar datos en la tabla Servicios
 INSERT INTO Servicios (servNombre, servDescripcion, servCosto, servDuracion)
@@ -151,3 +151,34 @@ SELECT * FROM Cliente;
 SELECT * FROM Horarios;
 SELECT * FROM Profesional;
 SELECT * FROM Hv;
+
+SELECT 
+    idProfesional,         -- Devuelve el ID único del profesional (clave primaria, normalmente 1)
+    nombreProfesional,     -- Devuelve el nombre completo (ej: "Natalia Ruiz")
+    correoProfesional,     -- Devuelve el correo electrónico (ej: "natalia@facialartist.com")
+    contraProfesional      -- Devuelve el hash bcrypt de la contraseña (el campo que hemos estado actualizando)
+FROM Profesional          -- Indica que la consulta se realiza sobre la tabla Profesional
+
+WHERE correoProfesional LIKE '%natalia%';
+-- Filtra los registros cuyo correo contenga la palabra "natalia" en cualquier posición.
+-- El % es un comodín: 
+--   - '%natalia%' = busca "natalia" en cualquier parte del correo
+--   - Ejemplos que coincidirían: natalia@facialartist.com, Natalia@facial.com, contacto.natalia@dominio.com
+-- Esto es útil para encontrar rápidamente el registro del administrador aunque no recuerdes el correo exacto o si tiene mayúsculas/minúsculas.
+
+SET SQL_SAFE_UPDATES = 0;  
+-- Desactiva temporalmente el "modo seguro" de MySQL. 
+-- Esto permite hacer UPDATE sin que obligatoriamente la condición WHERE use una columna clave (PRIMARY KEY o índice único).
+-- Se hace solo porque tu WHERE usa "idProfesional = 1" (que SÍ es clave primaria), pero a veces MySQL se queja igual en algunos entornos.
+
+UPDATE Profesional
+SET contraProfesional = '$2a$12$JkJSWyBm7tCmXgpotpAOf.F.v8Dr07raqmKDaeoVU8kmE1LIgiPyO'
+WHERE idProfesional = 1;
+-- Actualiza la contraseña del administrador (idProfesional = 1).
+-- El valor '$2a$12$JkJSWyBm7tCmXgpotpAOf.F.v8Dr07raqmKDaeoVU8kmE1LIgiPyO' 
+-- es un hash generado con bcrypt (12 rondas de costo) correspondiente exactamente a la contraseña plana "admin123".
+-- A partir de ahora, cuando el usuario ingrese "admin123", bcrypt.compare devolverá true y el login funcionará.
+
+SET SQL_SAFE_UPDATES = 1;  
+-- Reactiva el modo seguro inmediatamente después de la operación.
+-- Es buena práctica para evitar accidentes en futuras consultas.
