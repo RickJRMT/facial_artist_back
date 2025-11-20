@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS Profesional (
     nombreProfesional VARCHAR(100) NOT NULL,
     correoProfesional VARCHAR(100) NOT NULL,
     telefonoProfesional VARCHAR(20) NOT NULL,
-    contraProfesional VARCHAR(50) NOT NULL,
+    contraProfesional VARCHAR(300) NOT NULL,
     fechaCreacionProf DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
