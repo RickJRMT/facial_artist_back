@@ -37,13 +37,15 @@ class CursosController {
         try {
             // Convertir cursoImagen de Base64 (string desde frontend) a Buffer para MySQL
             const cursoImagen = data.cursoImagen ? Buffer.from(data.cursoImagen, 'base64') : null;
+            const cursoEstado = data.cursoEstado || 'activo'; // Valor por defecto
+            
             const [resultado] = await db.query(
-                'INSERT INTO Cursos (nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, cursoImagen) VALUES (?, ?, ?, ?, ?)',
-                [data.nombreCurso, data.cursoDescripcion, data.cursoDuracion, data.cursoCosto, cursoImagen]
+                'INSERT INTO Cursos (nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, cursoEstado, cursoImagen) VALUES (?, ?, ?, ?, ?, ?)',
+                [data.nombreCurso, data.cursoDescripcion, data.cursoDuracion, data.cursoCosto, cursoEstado, cursoImagen]
             );
             // Retorna el registro creado con el nuevo ID (cursoImagen como Base64 para consistencia)
             const nuevoId = resultado.insertId;
-            return { ...data, idCurso: nuevoId, cursoImagen: data.cursoImagen || null };
+            return { ...data, idCurso: nuevoId, cursoEstado, cursoImagen: data.cursoImagen || null };
         } catch (error) {
             throw error;
         }
@@ -56,11 +58,27 @@ class CursosController {
             if (!existing) {
                 throw new Error('Registro no encontrado');
             }
-            // Convertir cursoImagen de Base64 a Buffer si se proporciona
-            const cursoImagen = data.cursoImagen ? Buffer.from(data.cursoImagen, 'base64') : null;
+            
+            // Preparar campos a actualizar
+            const nombreCurso = data.nombreCurso;
+            const cursoDescripcion = data.cursoDescripcion;
+            const cursoDuracion = data.cursoDuracion;
+            const cursoCosto = data.cursoCosto;
+            const cursoEstado = data.cursoEstado || existing.cursoEstado; // Mantener estado existente si no se proporciona
+            
+            // Manejar imagen: solo actualizar si se proporciona nueva, sino mantener la existente
+            let cursoImagen;
+            if (data.cursoImagen !== undefined) {
+                // Si se proporciona cursoImagen (incluso si es null para eliminar)
+                cursoImagen = data.cursoImagen ? Buffer.from(data.cursoImagen, 'base64') : null;
+            } else {
+                // Si no se proporciona cursoImagen, mantener la imagen existente
+                cursoImagen = existing.cursoImagen ? Buffer.from(existing.cursoImagen, 'base64') : null;
+            }
+            
             const [resultado] = await db.query(
-                'UPDATE Cursos SET nombreCurso = ?, cursoDescripcion = ?, cursoDuracion = ?, cursoCosto = ?, cursoImagen = ? WHERE idCurso = ?',
-                [data.nombreCurso, data.cursoDescripcion, data.cursoDuracion, data.cursoCosto, cursoImagen, id]
+                'UPDATE Cursos SET nombreCurso = ?, cursoDescripcion = ?, cursoDuracion = ?, cursoCosto = ?, cursoEstado = ?, cursoImagen = ? WHERE idCurso = ?',
+                [nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, cursoEstado, cursoImagen, id]
             );
             if (resultado.affectedRows === 0) {
                 throw new Error('No se pudo actualizar el registro');
@@ -89,7 +107,7 @@ class CursosController {
 // Funciones para compatibilidad con las rutas existentes
 const crearCurso = async (req, res) => {
     try {
-        const { nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, imagenBase64 } = req.body;
+        const { nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, cursoEstado, imagenBase64 } = req.body;
 
         if (!nombreCurso) {
             return res.status(400).json({ message: 'El nombre del curso es requerido' });
@@ -103,12 +121,17 @@ const crearCurso = async (req, res) => {
             return res.status(400).json({ message: 'El costo no debe ser negativo' });
         }
 
+        if (cursoEstado && !['activo', 'inactivo'].includes(cursoEstado)) {
+            return res.status(400).json({ message: 'El estado del curso debe ser "activo" o "inactivo"' });
+        }
+
         const cursosController = new CursosController();
         const data = {
             nombreCurso,
             cursoDescripcion,
             cursoDuracion,
             cursoCosto,
+            cursoEstado: cursoEstado || 'activo',
             cursoImagen: imagenBase64
         };
 
@@ -152,7 +175,7 @@ const obtenerCursoPorId = async (req, res) => {
 const actualizarCurso = async (req, res) => {
     try {
         const { id } = req.params;
-        const { nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, imagenBase64 } = req.body;
+        const { nombreCurso, cursoDescripcion, cursoDuracion, cursoCosto, cursoEstado, imagenBase64 } = req.body;
 
         if (!nombreCurso) {
             return res.status(400).json({ message: 'El nombre del curso es requerido' });
@@ -166,14 +189,23 @@ const actualizarCurso = async (req, res) => {
             return res.status(400).json({ message: 'El costo no debe ser negativo' });
         }
 
+        if (cursoEstado && !['activo', 'inactivo'].includes(cursoEstado)) {
+            return res.status(400).json({ message: 'El estado del curso debe ser "activo" o "inactivo"' });
+        }
+
         const cursosController = new CursosController();
         const data = {
             nombreCurso,
             cursoDescripcion,
             cursoDuracion,
             cursoCosto,
-            cursoImagen: imagenBase64
+            cursoEstado
         };
+
+        // Solo incluir cursoImagen en data si se proporciona en el request
+        if (imagenBase64 !== undefined) {
+            data.cursoImagen = imagenBase64;
+        }
 
         const curso = await cursosController.actualizar(id, data);
         return res.status(200).json(curso);
