@@ -2,7 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const cursosController = require('../controllers/cursos.controller');
+const { verificarToken } = require('../middleware/auth.middleware');
 
+// ============ RUTAS PÚBLICAS (solo lectura para clientes) ============
 // GET /api/cursos - Obtener todos los cursos
 router.get('/', async (req, res) => {
     try {
@@ -29,8 +31,9 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// ============ RUTAS PROTEGIDAS (requieren autenticación admin) ============
 // POST /api/cursos - Crear un nuevo curso
-router.post('/', async (req, res) => {
+router.post('/', verificarToken, async (req, res) => {
     try {
         // Validar campos requeridos
         const { nombreCurso } = req.body;
@@ -52,7 +55,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/cursos/:id - Actualizar un curso por ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', verificarToken, async (req, res) => {
     try {
         await cursosController.actualizarCurso(req, res);
     } catch (error) {
@@ -65,7 +68,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/cursos/:id - Eliminar un curso por ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verificarToken, async (req, res) => {
     try {
         await cursosController.eliminarCurso(req, res);
     } catch (error) {

@@ -16,6 +16,7 @@ app.use('/api/servicios', require('./routes/servicios.routes'));
 app.use('/api/cliente', require('./routes/clientes.routes'));
 app.use('/api/citas', require('./routes/clientes.citas.routes'));
 app.use('/api/horarios', require('./routes/horarios.routes'));
+app.use('/api/profesional', require('./routes/profesionales.routes')); // Lectura pública, escritura protegida
 
 // ============ RUTA DE AUTENTICACIÓN ============
 app.use('/api/auth', require('./routes/auth.routes')); // ← NUEVA RUTA
@@ -25,7 +26,6 @@ const { verificarToken } = require('./middleware');
 
 app.use('/api/adminCitas', verificarToken, require('./routes/admin.citas.routes'));
 app.use('/api/hv', verificarToken, require('./routes/hv.routes'));
-app.use('/api/profesional', verificarToken, require('./routes/profesionales.routes'));
 app.use('/api/citas-profesional', verificarToken, require('./routes/citas_profesional.routes'));
 
 // ============ MANEJO GLOBAL DE ERRORES (siempre al final) ============

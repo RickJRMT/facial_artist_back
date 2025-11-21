@@ -2,7 +2,9 @@
 const express = require('express');
 const router = express.Router();
 const ServiciosController = require('../controllers/servicios.controller');
+const { verificarToken } = require('../middleware/auth.middleware');
 
+// ============ RUTAS PÚBLICAS (solo lectura para clientes) ============
 // GET /api/servicios - Obtener todos los registros de Servicios
 router.get('/', async (req, res) => {
     try {
@@ -37,8 +39,9 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// ============ RUTAS PROTEGIDAS (requieren autenticación admin) ============
 // POST /api/servicios - Crear un nuevo Servicio
-router.post('/', async (req, res) => {
+router.post('/', verificarToken, async (req, res) => {
     try {
         // Validar campos requeridos
         const { servNombre, servDescripcion, servCosto, servDuracion } = req.body;
@@ -71,7 +74,7 @@ router.post('/', async (req, res) => {
 });
 
 // PUT /api/servicios/:id - Actualizar un Servicio por ID
-router.put('/:id', async (req, res) => {
+router.put('/:id', verificarToken, async (req, res) => {
     try {
         // Nota: servImagen como Base64 opcional
         const data = { ...req.body };
@@ -93,7 +96,7 @@ router.put('/:id', async (req, res) => {
 });
 
 // DELETE /api/servicios/:id - Eliminar un Servicio por ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', verificarToken, async (req, res) => {
     try {
         const result = await ServiciosController.eliminar(req.params.id);
         res.json({ success: true, message: result.mensaje });
